@@ -1,36 +1,31 @@
 import pandas as pd
+import spacy
+from collections import defaultdict
+
+df = pd.read_csv('Movies_and_TV_User.csv')
+
+nlp = spacy.load('en_core_web_sm')
+
+user_profiles = defaultdict(set)
+
+# Process each row
+for _, row in df.iterrows():
+    user = row['user_id']
+    review = row['review']
+    doc = nlp(str(review))
+
+    #stemming, tokinize , normlize , extract POS,
+    keywords = [token.lemma_.lower() for token in doc if token.pos_ in ['NOUN', 'ADJ'] and not token.is_stop]
+
+
+    user_profiles[user].update(keywords)
+
+
+user_profiles = {user: list(keywords) for user, keywords in user_profiles.items()}
+
+
+
 import json
-import gzip
 
-import pandas as pd
-import gzip
-
-def parse(path):
-  g = gzip.open(path, 'rb')
-  for l in g:
-    yield json.loads(l)
-
-def getDF(path):
-  i = 0
-  df = {}
-  for d in parse(path):
-    df[i] = d
-    i += 1
-  return pd.DataFrame.from_dict(df, orient='index')
-
-df = getDF('Movies_and_TV.json.gz')
-
-df = df[['reviewerID', 'reviewText']]
-
-
-# Step 1: Get 30 unique reviewerIDs
-selected_reviewers = df['reviewerID'].drop_duplicates().head(30)
-
-# Step 2: Filter the DataFrame to keep only rows with those reviewerIDs
-df_30 = df[df['reviewerID'].isin(selected_reviewers)]
-
-# Step 3: (Optional) Reset index for clean output
-df_30 = df_30.reset_index(drop=True)
-df_30.to_csv('Movies_and_TV_User.csv')
-# Preview result
-print(df_30.head())
+with open('user_profiles.json', 'w') as f:
+    json.dump(user_profiles, f, indent=2)
