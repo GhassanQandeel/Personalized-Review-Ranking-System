@@ -5,9 +5,13 @@ import re
 from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, r2_score
 import warnings
+import json
 
 warnings.filterwarnings('ignore')
 
@@ -16,12 +20,10 @@ warnings.filterwarnings('ignore')
 # DATA LOADING AND PREPROCESSING
 # ================================
 
-def load_your_data():
-
-
+def load_your_data(asin):
     # Convert to DataFrame
     df = pd.read_csv('Movies_and_TV_Reviews_en.csv')
-
+    df = df[df['asin'] == asin]
     def estimate_rating(text):
         positive_indicators = ['love', 'great', 'best', 'excellent', 'amazing', 'perfect']
         negative_indicators = ['bad', 'terrible', 'poor', 'awful', 'disappointing']
@@ -64,50 +66,15 @@ def load_your_data():
     return df
 
 
-def create_user_profiles_for_your_data():
-    """
-    Create realistic user profiles based on your review data
-    """
-    user_queries = [
-        {
-            'userId': 1,
-            'query': 'historical accuracy WWII Band of Brothers',
-            'interests': ['history', 'accuracy', 'documentary', 'war', 'educational'],
-            'demographic': {'age_group': '45-60', 'interests_history': True},
-            'past_purchases': ['war_documentaries', 'historical_series', 'HBO_shows']
-        },
-        {
-            'userId': 2,
-            'query': 'great war series entertainment value',
-            'interests': ['entertainment', 'series', 'drama', 'action', 'value'],
-            'demographic': {'age_group': '25-40', 'interests_history': False},
-            'past_purchases': ['tv_series', 'action_movies', 'streaming_content']
-        },
-        {
-            'userId': 3,
-            'query': 'gift for father military history lover',
-            'interests': ['gift', 'military', 'history', 'family', 'father'],
-            'demographic': {'age_group': '30-45', 'interests_history': True},
-            'past_purchases': ['gifts', 'military_history', 'documentaries']
-        },
-        {
-            'userId': 4,
-            'query': 'emotional war story miniseries',
-            'interests': ['emotion', 'story', 'characters', 'drama', 'miniseries'],
-            'demographic': {'age_group': '35-50', 'interests_history': True},
-            'past_purchases': ['drama_series', 'character_driven_shows', 'award_winners']
-        },
-        {
-            'userId': 5,
-            'query': 'best HBO war production quality',
-            'interests': ['quality', 'production', 'HBO', 'premium', 'cinematic'],
-            'demographic': {'age_group': '40-55', 'interests_history': True},
-            'past_purchases': ['HBO_shows', 'premium_content', 'high_budget_series']
-        }
-    ]
+def create_user_profiles_for_your_data(user_id):
+    with open('user_profiles.json', 'r', encoding='utf-8') as f:
+        user_profiles = json.load(f)
+    user_queries = []
+    for profile in user_profiles['user_profiles']:
+        user_queries.append(profile)
 
+    user_queries = [profile for profile in user_queries if profile['userId'] == user_id]
     return user_queries
-
 
 # ================================
 # ENHANCED FEATURE ENGINEERING FOR YOUR DATA
@@ -295,20 +262,6 @@ def phase1_feature_engineering_custom(df):
 
     feature_df = pd.DataFrame(features_list)
 
-    # Display sample analysis
-    print("Sample Feature Analysis:")
-    print("-" * 40)
-    for i in range(min(3, len(feature_df))):
-        sample = feature_df.iloc[i]
-        print(f"Review {sample['id']}:")
-        print(f"Text: {sample['original_text']}")
-        print(f"Quality Score: {sample['quality_score']:.2f}")
-        print(f"War/History mentions: {sample.get('war_history_mentions', 0)}")
-        print(f"Sentiment Score: {sample['sentiment_score']:.2f}")
-        print(f"Helpfulness Ratio: {sample['helpfulness_ratio']:.2f}")
-        print(f"Text Length: {sample['text_length']}")
-        print("-" * 40)
-
     return feature_df
 
 
@@ -355,7 +308,7 @@ def phase2_personalization_custom(feature_df, user_queries):
     personalized_results = {}
 
     for user_profile in user_queries:
-        user_id = user_profile['userId']
+        user_id = user_profile["userId"]
         print(f"Processing User {user_id}:")
         print(f"Query: '{user_profile['query']}'")
         print(f"Interests: {user_profile['interests']}")
@@ -435,323 +388,462 @@ def phase2_personalization_custom(feature_df, user_queries):
         user_results.sort(key=lambda x: x['personalization_score'], reverse=True)
         personalized_results[user_id] = user_results
 
-        # Show top personalized reviews
-        print("Top 3 personalized reviews:")
-        for i, review in enumerate(user_results[:3], 1):
-            print(f"{i}. Review ID {review['review_id']} (Personalization: {review['personalization_score']:.2f})")
-            print(f"   Text: {review['original_text']}")
-            print(f"   Semantic: {review['semantic_similarity']:.2f}, Interest: {review['interest_alignment']:.2f}")
-        print("-" * 50)
-
     return personalized_results
 
 
 # ================================
-# FINAL RANKING SYSTEM
+# ML-BASED RANKING SYSTEM (PHASE 3)
 # ================================
 
-def phase3_ranking_system_custom(feature_df, personalized_results):
+def create_training_data(feature_df, personalized_results):
     """
-    Phase 3: Final ranking system customized for your data
+    Create training data for the ranking model
     """
-    print("=== PHASE 3: FINAL RANKING SYSTEM (Customized) ===")
-    print("Generating final personalized rankings...\n")
+    print("🔧 Creating training data for ML ranking model...")
 
-    # Adjusted weights for your domain
-    ranking_weights = {
-        'quality': 0.20,
-        'personalization': 0.40,  # Higher weight for personalization
-        'helpfulness': 0.20,
-        'recency': 0.10,
-        'verification': 0.10
-    }
-
-    final_rankings = {}
+    training_data = []
 
     for user_id, user_reviews in personalized_results.items():
-        print(f"Final Rankings for User {user_id}:")
-
-        ranked_reviews = []
-
         for review_data in user_reviews:
             review_id = review_data['review_id']
             review = feature_df[feature_df['id'] == review_id].iloc[0]
 
-            # Calculate final score
-            final_score = (
-                    review['quality_score'] * ranking_weights['quality'] +
-                    review_data['personalization_score'] * ranking_weights['personalization'] +
-                    review['helpfulness_ratio'] * 5 * ranking_weights['helpfulness'] +
-                    review['recency_score'] * ranking_weights['recency'] +
-                    review['verified_purchase'] * ranking_weights['verification']
+            # Create synthetic relevance score based on multiple factors
+            # This simulates user feedback/engagement data
+            relevance_score = (
+                    review['quality_score'] * 0.25 +
+                    review_data['personalization_score'] * 0.35 +
+                    review['helpfulness_ratio'] * 3 * 0.20 +
+                    review['recency_score'] * 0.10 +
+                    review['verified_purchase'] * 0.10 +
+                    # Add some noise to make it more realistic
+                    np.random.normal(0, 0.5)
             )
 
-            ranked_reviews.append({
-                'review_id': review_id,
-                'final_score': final_score,
+            # Clip to reasonable range
+            relevance_score = np.clip(relevance_score, 0, 10)
+
+            # Features for the model
+            features = {
+                'user_id': user_id,
                 'quality_score': review['quality_score'],
                 'personalization_score': review_data['personalization_score'],
+                'semantic_similarity': review_data['semantic_similarity'],
+                'interest_alignment': review_data['interest_alignment'],
                 'helpfulness_ratio': review['helpfulness_ratio'],
-                'original_text': review['original_text'],
+                'helpful_votes': review['helpful_votes'],
+                'total_votes': review['total_votes'],
+                'recency_score': review['recency_score'],
+                'verified_purchase': review['verified_purchase'],
                 'rating': review['rating'],
+                'text_length': review['text_length'],
+                'text_word_count': review['text_word_count'],
+                'sentiment_score': review['sentiment_score'],
+                'sentiment_polarity': review['sentiment_polarity'],
+                'war_history_mentions': review.get('war_history_mentions', 0),
+                'emotional_impact_mentions': review.get('emotional_impact_mentions', 0),
+                'story_narrative_mentions': review.get('story_narrative_mentions', 0),
+                'authenticity_mentions': review.get('authenticity_mentions', 0),
+                'recommendation_mentions': review.get('recommendation_mentions', 0),
+                'personal_context_mentions': review.get('personal_context_mentions', 0),
+                'relevance_score': relevance_score  # Target variable
+            }
+
+            training_data.append(features)
+
+    training_df = pd.DataFrame(training_data)
+    print(f"✅ Created training dataset with {len(training_df)} samples")
+    print(f"   - Users: {training_df['user_id'].nunique()}")
+    print(f"   - Features: {len(training_df.columns) - 2}")  # Exclude user_id and target
+    print(f"   - Target range: {training_df['relevance_score'].min():.2f} - {training_df['relevance_score'].max():.2f}")
+
+    return training_df
+
+
+def train_ranking_models_ridge_only(training_df):
+    """
+    Train only Ridge Regression model for ranking
+    """
+    print("\n🤖 Training Ridge Regression ranking model...")
+
+    # Prepare features and target
+    feature_cols = [col for col in training_df.columns if col not in ['user_id', 'relevance_score']]
+    X = training_df[feature_cols]
+    y = training_df['relevance_score']
+
+    # Handle any missing values
+    X = X.fillna(0)
+
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Scale features (Ridge requires scaling)
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # Initialize Ridge Regression with different alpha values to test
+    alphas = [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+    best_alpha = 1.0
+    best_cv_score = -np.inf
+
+    print("🔍 Testing different Ridge alpha values...")
+
+    # Find best alpha through cross-validation
+    for alpha in alphas:
+        ridge_model = Ridge(alpha=alpha, random_state=42)
+        cv_scores = cross_val_score(ridge_model, X_train_scaled, y_train, cv=5)
+        cv_mean = cv_scores.mean()
+
+        print(f"   Alpha {alpha}: CV R² = {cv_mean:.3f} (±{cv_scores.std():.3f})")
+
+        if cv_mean > best_cv_score:
+            best_cv_score = cv_mean
+            best_alpha = alpha
+
+    # Train final model with best alpha
+    print(f"\n🏆 Best alpha: {best_alpha} (CV R²: {best_cv_score:.3f})")
+
+    final_model = Ridge(alpha=best_alpha, random_state=42)
+    final_model.fit(X_train_scaled, y_train)
+
+    # Evaluate final model
+    train_score = final_model.score(X_train_scaled, y_train)
+    test_score = final_model.score(X_test_scaled, y_test)
+
+    print(f"\n📊 Final Ridge Model Performance:")
+    print(f"   📊 Train R²: {train_score:.3f}")
+    print(f"   📊 Test R²: {test_score:.3f}")
+    print(f"   📊 CV R²: {best_cv_score:.3f}")
+
+    # Feature importance (coefficients for Ridge)
+    feature_importance = pd.DataFrame({
+        'feature': feature_cols,
+        'coefficient': final_model.coef_,
+        'abs_coefficient': np.abs(final_model.coef_)
+    }).sort_values('abs_coefficient', ascending=False)
+
+
+
+    model_results = {
+        'Ridge Regression': {
+            'model': final_model,
+            'train_score': train_score,
+            'test_score': test_score,
+            'cv_mean': best_cv_score,
+            'best_alpha': best_alpha,
+            'feature_importance': feature_importance
+        }
+    }
+
+    return final_model, scaler, feature_cols, model_results
+
+
+
+
+def phase3_ml_ranking_system_ridge_only(feature_df, personalized_results):
+    """
+    Phase 3: ML-based ranking system using only Ridge Regression
+    """
+    print("=== PHASE 3: RIDGE REGRESSION RANKING SYSTEM ===")
+    print("Using Ridge Regression to rank reviews...\n")
+
+    # Create training data
+    training_df = create_training_data(feature_df, personalized_results)
+
+    # Train Ridge regression model only
+    model, scaler, feature_cols, model_results = train_ranking_models_ridge_only(training_df)
+
+    # Generate predictions for all user-review combinations
+    print("\n🔮 Generating Ridge Regression rankings...")
+
+    final_rankings = {}
+
+    for user_id, user_reviews in personalized_results.items():
+        print(f"\nRidge Regression Rankings for User {user_id}:")
+
+        ranked_reviews = []
+
+        # Prepare features for this user's reviews
+        user_features = []
+        for review_data in user_reviews:
+            review_id = review_data['review_id']
+            review = feature_df[feature_df['id'] == review_id].iloc[0]
+
+            features = {
+                'quality_score': review['quality_score'],
+                'personalization_score': review_data['personalization_score'],
+                'semantic_similarity': review_data['semantic_similarity'],
+                'interest_alignment': review_data['interest_alignment'],
+                'helpfulness_ratio': review['helpfulness_ratio'],
+                'helpful_votes': review['helpful_votes'],
+                'total_votes': review['total_votes'],
+                'recency_score': review['recency_score'],
+                'verified_purchase': review['verified_purchase'],
+                'rating': review['rating'],
+                'text_length': review['text_length'],
+                'text_word_count': review['text_word_count'],
+                'sentiment_score': review['sentiment_score'],
+                'sentiment_polarity': review['sentiment_polarity'],
+                'war_history_mentions': review.get('war_history_mentions', 0),
+                'emotional_impact_mentions': review.get('emotional_impact_mentions', 0),
+                'story_narrative_mentions': review.get('story_narrative_mentions', 0),
+                'authenticity_mentions': review.get('authenticity_mentions', 0),
+                'recommendation_mentions': review.get('recommendation_mentions', 0),
+                'personal_context_mentions': review.get('personal_context_mentions', 0),
+            }
+
+            user_features.append(features)
+
+        # Convert to DataFrame and ensure all features are present
+        user_features_df = pd.DataFrame(user_features)
+        for col in feature_cols:
+            if col not in user_features_df.columns:
+                user_features_df[col] = 0
+
+        user_features_df = user_features_df[feature_cols].fillna(0)
+
+        # Make predictions using scaled features (Ridge requires scaling)
+        ml_scores = model.predict(scaler.transform(user_features_df))
+
+        # Combine with review data
+        for i, (review_data, ml_score) in enumerate(zip(user_reviews, ml_scores)):
+            review_info = {
+                'review_id': review_data['review_id'],
+                'ridge_score': ml_score,  # Changed from ml_score to ridge_score for clarity
+                'personalization_score': review_data['personalization_score'],
+                'quality_score': feature_df[feature_df['id'] == review_data['review_id']]['quality_score'].iloc[0],
+                'original_text': review_data['original_text'],
+                'rating': review_data['rating'],
                 'semantic_similarity': review_data['semantic_similarity'],
                 'interest_alignment': review_data['interest_alignment']
-            })
+            }
+            ranked_reviews.append(review_info)
 
-        # Sort by final score
-        ranked_reviews.sort(key=lambda x: x['final_score'], reverse=True)
+        # Sort by Ridge score
+        ranked_reviews.sort(key=lambda x: x['ridge_score'], reverse=True)
         final_rankings[user_id] = ranked_reviews
 
-        # Display top 5 reviews
-        print("🏆 TOP 5 RECOMMENDED REVIEWS:")
-        for i, review in enumerate(ranked_reviews[:5], 1):
-            print(f"\n{i}. Review ID {review['review_id']} | Final Score: {review['final_score']:.2f}")
-            print(f"   📝 Text: {review['original_text']}")
-            print(f"   ⭐ Rating: {review['rating']}/5")
-            print(
-                f"   📊 Quality: {review['quality_score']:.2f} | Personalization: {review['personalization_score']:.2f}")
-            print(
-                f"   🎯 Semantic Match: {review['semantic_similarity']:.2f} | Interest Align: {review['interest_alignment']:.2f}")
-
-        print("=" * 70)
-
-    return final_rankings
 
 
-# ================================
-# EVALUATION METRICS
-# ================================
-
-def evaluate_system_performance(final_rankings, feature_df):
-    """Evaluate the performance of your customized system"""
-    print("=== SYSTEM PERFORMANCE EVALUATION ===\n")
-
-    for user_id, rankings in final_rankings.items():
-        print(f"User {user_id} Performance Metrics:")
-
-        # Top-k analysis
-        top_3 = rankings[:3]
-        top_5 = rankings[:5]
-
-        # Average metrics for top recommendations
-        avg_rating_top3 = np.mean([r['rating'] for r in top_3])
-        avg_quality_top3 = np.mean([r['quality_score'] for r in top_3])
-        avg_helpfulness_top3 = np.mean([r['helpfulness_ratio'] for r in top_3])
-
-        print(f"  📈 Top 3 Avg Rating: {avg_rating_top3:.2f}/5")
-        print(f"  📈 Top 3 Avg Quality Score: {avg_quality_top3:.2f}")
-        print(f"  📈 Top 3 Avg Helpfulness: {avg_helpfulness_top3:.2f}")
-
-        # Coverage analysis
-        unique_content_types = set()
-        for review in top_5:
-            review_text = review['original_text'].lower()
-            if any(word in review_text for word in ['history', 'war', 'historical']):
-                unique_content_types.add('historical')
-            if any(word in review_text for word in ['story', 'character', 'acting']):
-                unique_content_types.add('narrative')
-            if any(word in review_text for word in ['gift', 'present', 'father']):
-                unique_content_types.add('personal')
-            if any(word in review_text for word in ['value', 'worth', 'price']):
-                unique_content_types.add('value')
-
-        print(f"  🎯 Content Diversity: {len(unique_content_types)} different themes in top 5")
-        print(f"  📋 Themes covered: {', '.join(unique_content_types)}")
-        print("-" * 50)
+    return final_rankings, model, scaler, feature_cols
 
 
-# ================================
-# MAIN EXECUTION
-# ================================
+def evaluate_ranking_systems(feature_df, personalized_results, ml_rankings):
+        """
+        Compare different ranking approaches
+        """
+        print("=== RANKING SYSTEM EVALUATION ===")
+        print("Comparing different ranking approaches...\n")
 
-def main_custom():
-    """Main execution function for your customized data"""
-    print("🚀 PERSONALIZED REVIEW RANKING SYSTEM")
-    print("📊 Customized for Your Data")
-    print("=" * 70)
+        evaluation_results = {}
 
-    # Load your actual data
-    reviews_df = load_your_data()
-    user_queries = create_user_profiles_for_your_data()
+        for user_id in personalized_results.keys():
+            print(f"📊 Evaluation for User {user_id}:")
 
-    print(f"✅ Loaded {len(reviews_df)} reviews from your dataset")
-    print(f"✅ Created {len(user_queries)} user profiles for testing\n")
+            # Get rankings from different methods
+            rule_based = personalized_results[user_id]  # Rule-based personalization
+            ml_based = ml_rankings[user_id]  # ML-based ranking
 
-    # Show sample of your raw data
-    print("📋 Sample of Your Raw Data:")
-    print(reviews_df[['index', 'asin', 'reviewText']].head())
-    print(f"\nDataset shape: {reviews_df.shape}")
-    print(f"Columns: {list(reviews_df.columns)}\n")
+            # Create baseline ranking (by rating and helpfulness)
+            baseline_ranking = []
+            for review_data in rule_based:
+                review_id = review_data['review_id']
+                review = feature_df[feature_df['id'] == review_id].iloc[0]
+                baseline_score = review['rating'] * 0.5 + review['helpfulness_ratio'] * 2.5
+                baseline_ranking.append({
+                    'review_id': review_id,
+                    'score': baseline_score,
+                    'original_text': review_data['original_text']
+                })
+
+            baseline_ranking.sort(key=lambda x: x['score'], reverse=True)
+
+            # Compare top 5 recommendations
+            print("🔍 Top 5 Recommendations Comparison:")
+            print("\nRule-based Personalization:")
+            for i, review in enumerate(rule_based[:5], 1):
+                print(f"{i}. ID {review['review_id']} (Score: {review['personalization_score']:.2f})")
+
+            print("\nML-based Ranking:")
+            for i, review in enumerate(ml_based[:5], 1):
+                print(f"{i}. ID {review['review_id']} (Score: {review['ml_score']:.2f})")
+
+            print("\nBaseline (Rating + Helpfulness):")
+            for i, review in enumerate(baseline_ranking[:5], 1):
+                print(f"{i}. ID {review['review_id']} (Score: {review['score']:.2f})")
+
+            # Calculate ranking correlation
+            rule_top5 = [r['review_id'] for r in rule_based[:5]]
+            ml_top5 = [r['review_id'] for r in ml_based[:5]]
+            baseline_top5 = [r['review_id'] for r in baseline_ranking[:5]]
+
+            # Overlap analysis
+            rule_ml_overlap = len(set(rule_top5) & set(ml_top5))
+            rule_baseline_overlap = len(set(rule_top5) & set(baseline_top5))
+            ml_baseline_overlap = len(set(ml_top5) & set(baseline_top5))
+
+            evaluation_results[user_id] = {
+                'rule_ml_overlap': rule_ml_overlap,
+                'rule_baseline_overlap': rule_baseline_overlap,
+                'ml_baseline_overlap': ml_baseline_overlap,
+                'rule_based_avg_score': np.mean([r['personalization_score'] for r in rule_based[:5]]),
+                'ml_based_avg_score': np.mean([r['ml_score'] for r in ml_based[:5]]),
+                'baseline_avg_score': np.mean([r['score'] for r in baseline_ranking[:5]])
+            }
+
+        return evaluation_results
+
+    # ================================
+    # RECOMMENDATION GENERATION
+    # ================================
+
+def generate_personalized_recommendations_ridge(user_id, ridge_rankings, feature_df, top_k=5):
+    """
+    Generate final personalized recommendations using Ridge Regression scores
+    """
+    print(f"🎯 RIDGE REGRESSION RECOMMENDATIONS FOR USER {user_id}")
+    print("=" * 60)
+
+    user_rankings = ridge_rankings[user_id]
+    recommendations = []
+
+    for i, review_data in enumerate(user_rankings[:top_k], 1):
+        review_id = review_data['review_id']
+        review = feature_df[feature_df['id'] == review_id].iloc[0]
+
+        # Generate explanation
+        explanation_factors = []
+
+        if review_data['semantic_similarity'] > 0.3:
+            explanation_factors.append("highly relevant to your search")
+
+        if review_data['interest_alignment'] > 1.0:
+            explanation_factors.append("matches your interests")
+
+        if review['quality_score'] > 3.0:
+            explanation_factors.append("high-quality detailed review")
+
+        if review['helpfulness_ratio'] > 0.7:
+            explanation_factors.append("found helpful by other users")
+
+        if review['verified_purchase'] == 1:
+            explanation_factors.append("from verified purchase")
+
+        if review['rating'] >= 4:
+            explanation_factors.append("positive rating")
+
+        if review.get('war_history_mentions', 0) > 0:
+            explanation_factors.append("discusses historical accuracy")
+
+        if review.get('emotional_impact_mentions', 0) > 0:
+            explanation_factors.append("mentions emotional impact")
+
+        explanation = f"Recommended because it's {', '.join(explanation_factors[:3])}"
+        if len(explanation_factors) > 3:
+            explanation += f" and {len(explanation_factors) - 3} other factors"
+
+        recommendation = {
+            'rank': i,
+            'review_id': review_id,
+            'ridge_score': review_data['ridge_score'],  # Changed from ml_score
+            'rating': review['rating'],
+            'text': review['original_text'],
+            'explanation': explanation,
+            'key_metrics': {
+                'quality_score': review['quality_score'],
+                'helpfulness_ratio': review['helpfulness_ratio'],
+                'semantic_similarity': review_data['semantic_similarity'],
+                'personalization_score': review_data['personalization_score']
+            }
+        }
+
+        recommendations.append(recommendation)
+
+
+
+
+    return recommendations
+
+    # ================================
+    # MAIN EXECUTION FUNCTION
+    # ================================
+def run_complete_recommendation_system_ridge_only(user_id, asin):
+    """
+    Run the complete recommendation system with Ridge Regression only
+    """
+    global recommendations
+    print("🚀 STARTING RECOMMENDATION SYSTEM")
+
+
+    # Load and preprocess data
+    print("📊 Loading your review data...")
+    df = load_your_data(asin)
+    print(f"✅ Loaded {len(df)} reviews successfully\n")
+
+    # Create user profiles
+    user_queries = create_user_profiles_for_your_data(user_id)
 
     # Phase 1: Feature Engineering
-    try:
-        feature_df = phase1_feature_engineering_custom(reviews_df)
-        print(f"✅ Phase 1 Complete: Extracted features for {len(feature_df)} reviews\n")
-
-        # Display feature summary
-        print("📊 Feature Engineering Summary:")
-        print(f"   - Text features: {len([col for col in feature_df.columns if col.startswith('text_')])} metrics")
-        print(
-            f"   - Domain features: {len([col for col in feature_df.columns if 'mentions' in col])} domain-specific signals")
-        print(
-            f"   - Sentiment features: {len([col for col in feature_df.columns if col.startswith('sentiment_')])} sentiment metrics")
-        print(
-            f"   - Quality features: {len([col for col in feature_df.columns if 'quality' in col or 'helpful' in col])} quality indicators")
-        print(f"   - Average quality score: {feature_df['quality_score'].mean():.2f}")
-        print()
-
-    except Exception as e:
-        print(f"❌ Error in Phase 1: {str(e)}")
-        return
+    feature_df = phase1_feature_engineering_custom(df)
+    print(f"✅ Phase 1 Complete: Extracted features for {len(feature_df)} reviews\n")
 
     # Phase 2: Personalization
-    try:
-        personalized_results = phase2_personalization_custom(feature_df, user_queries)
-        print(f"✅ Phase 2 Complete: Personalized rankings for {len(personalized_results)} users\n")
+    personalized_results = phase2_personalization_custom(feature_df, user_queries)
+    print(f"✅ Phase 2 Complete: Generated personalized rankings\n")
 
-        # Display personalization summary
-        print("🎯 Personalization Summary:")
-        for user_id, results in personalized_results.items():
-            avg_personalization = np.mean([r['personalization_score'] for r in results[:10]])
-            avg_semantic = np.mean([r['semantic_similarity'] for r in results[:10]])
-            print(
-                f"   User {user_id}: Avg personalization score {avg_personalization:.2f}, Avg semantic similarity {avg_semantic:.2f}")
-        print()
+    # Phase 3: Ridge Regression Ranking
+    ridge_rankings, model, scaler, feature_cols = phase3_ml_ranking_system_ridge_only(
+        feature_df, personalized_results
+    )
+    print(f"✅ Phase 3 Complete: Ridge Regression ranking system trained and applied\n")
 
-    except Exception as e:
-        print(f"❌ Error in Phase 2: {str(e)}")
-        return
-
-    # Phase 3: Final Ranking
-    try:
-        final_rankings = phase3_ranking_system_custom(feature_df, personalized_results)
-        print(f"✅ Phase 3 Complete: Final rankings generated for all users\n")
-
-    except Exception as e:
-        print(f"❌ Error in Phase 3: {str(e)}")
-        return
-
-    # Phase 4: Evaluation
-    try:
-        evaluate_system_performance(final_rankings, feature_df)
-
-    except Exception as e:
-        print(f"❌ Error in Evaluation: {str(e)}")
-
-    # Additional Analysis and Insights
-    print("\n" + "=" * 70)
-    print("🔍 ADDITIONAL SYSTEM INSIGHTS")
+    # Generate final recommendations
+    print("🎯 GENERATING FINAL RIDGE REGRESSION RECOMMENDATIONS")
     print("=" * 70)
 
-    # Overall system statistics
-    total_reviews = len(feature_df)
-    avg_quality = feature_df['quality_score'].mean()
-    high_quality_count = len(feature_df[feature_df['quality_score'] > 5])
+    for user_profile in user_queries:
+        user_id_num = user_profile['userId']
+        print(f"\n👤 User {user_id_num} Query: '{user_profile['query']}'")
+        print(f"Interests: {user_profile['interests']}")
 
-    print(f"📈 System Statistics:")
-    print(f"   - Total reviews processed: {total_reviews}")
-    print(f"   - Average quality score: {avg_quality:.2f}")
-    print(f"   - High-quality reviews (>5.0): {high_quality_count} ({high_quality_count / total_reviews * 100:.1f}%)")
-    print(
-        f"   - Verified purchases: {feature_df['verified_purchase'].sum()} ({feature_df['verified_purchase'].mean() * 100:.1f}%)")
-    print(f"   - Recent reviews (≤90 days): {feature_df['is_recent'].sum()}")
+        recommendations = generate_personalized_recommendations_ridge(
+            user_id_num, ridge_rankings, feature_df, top_k=3
+        )
 
-    # Feature importance analysis
-    print(f"\n📊 Content Analysis:")
-    print(f"   - Reviews mentioning war/history: {len(feature_df[feature_df['war_history_mentions'] > 0])}")
-    print(f"   - Reviews with emotional impact: {len(feature_df[feature_df['emotional_impact_mentions'] > 0])}")
-    print(f"   - Reviews with recommendations: {len(feature_df[feature_df['recommendation_mentions'] > 0])}")
-    print(f"   - Reviews in personal context: {len(feature_df[feature_df['personal_context_mentions'] > 0])}")
-
-    # Personalization effectiveness
-    print(f"\n🎯 Personalization Effectiveness:")
-    for user_id, rankings in final_rankings.items():
-        user_profile = next(u for u in user_queries if u['userId'] == user_id)
-        top_3_scores = [r['final_score'] for r in rankings[:3]]
-        top_3_personalization = [r['personalization_score'] for r in rankings[:3]]
-
-        print(f"   User {user_id} ({user_profile['query'][:30]}...):")
-        print(f"     - Top 3 final scores: {[f'{s:.2f}' for s in top_3_scores]}")
-        print(f"     - Top 3 personalization: {[f'{s:.2f}' for s in top_3_personalization]}")
-
-    # Recommendations for system improvement
-    print(f"\n💡 System Recommendations:")
-
-    low_quality_count = len(feature_df[feature_df['quality_score'] < 2])
-    if low_quality_count > total_reviews * 0.2:
-        print(f"   ⚠️  High number of low-quality reviews ({low_quality_count}). Consider filtering threshold.")
-
-    low_helpfulness = len(feature_df[feature_df['helpfulness_ratio'] < 0.3])
-    if low_helpfulness > total_reviews * 0.3:
-        print(f"   ⚠️  Many reviews have low helpfulness ratios. Consider weighting adjustment.")
-
-    old_reviews = len(feature_df[feature_df['days_since_review'] > 365])
-    if old_reviews > total_reviews * 0.5:
-        print(f"   ℹ️  {old_reviews} reviews are over 1 year old. Consider recency boost.")
-
-    print(f"   ✅ System successfully personalized {len(user_queries)} different user profiles")
-    print(
-        f"   ✅ Average semantic similarity in top results: {np.mean([np.mean([r['semantic_similarity'] for r in rankings[:5]]) for rankings in final_rankings.values()]):.3f}")
-
-    print("\n" + "=" * 70)
-    print("🎉 SYSTEM EXECUTION COMPLETE!")
-    print("=" * 70)
-
-    return final_rankings, feature_df, personalized_results
+    return recommendations
 
 
-# Additional utility functions for post-analysis
-def export_results_to_csv(final_rankings, feature_df, filename_prefix="ranking_results"):
-    """Export results to CSV files for further analysis"""
-    print(f"\n📁 Exporting results to CSV files...")
 
-    try:
-        # Export feature data
-        feature_df.to_csv(f"{filename_prefix}_features.csv", index=False)
-        print(f"   ✅ Features exported to {filename_prefix}_features.csv")
-
-        # Export rankings for each user
-        for user_id, rankings in final_rankings.items():
-            rankings_df = pd.DataFrame(rankings)
-            rankings_df.to_csv(f"{filename_prefix}_user_{user_id}.csv", index=False)
-            print(f"   ✅ User {user_id} rankings exported to {filename_prefix}_user_{user_id}.csv")
-
-    except Exception as e:
-        print(f"   ❌ Export error: {str(e)}")
+def get_asin_by_value(product_dict, target_value):
+    for asin, value in product_dict.items():
+        if value == target_value:
+            return asin
+    return None  # if not found
 
 
-def generate_user_report(user_id, final_rankings, user_queries, feature_df):
-    """Generate detailed report for a specific user"""
-    print(f"\n📋 DETAILED REPORT FOR USER {user_id}")
-    print("=" * 50)
 
-    user_profile = next(u for u in user_queries if u['userId'] == user_id)
-    rankings = final_rankings[user_id]
+df_ar=pd.read_csv('Movies_and_TV_Reviews_ar.csv')
 
-    print(f"🔍 User Query: '{user_profile['query']}'")
-    print(f"🎯 Interests: {', '.join(user_profile['interests'])}")
-    print(f"👤 Demographics: {user_profile['demographic']}")
-    print(f"🛒 Past Purchases: {', '.join(user_profile['past_purchases'])}")
-
-    print(f"\n📊 Top 10 Recommended Reviews:")
-    for i, review in enumerate(rankings[:10], 1):
-        print(f"\n{i}. Review ID: {review['review_id']}")
-        print(f"   Final Score: {review['final_score']:.2f}")
-        print(f"   Rating: {review['rating']}/5 ⭐")
-        print(f"   Quality: {review['quality_score']:.2f}")
-        print(f"   Personalization: {review['personalization_score']:.2f}")
-        print(f"   Semantic Match: {review['semantic_similarity']:.2f}")
-        print(f"   Interest Alignment: {review['interest_alignment']:.2f}")
-        print(f"   Text: {review['original_text'][:100]}...")
-
-
-# Execute the system
 if __name__ == "__main__":
-    # Run the main system
-    final_rankings, feature_df, personalized_results = main_custom()
+        user_id=2
+        products_asins = {
+            "B00R8GUXPG": 1,
+            "B00PY4Q9OS": 2,
+            "B00Q0G2VXM": 3,
+            "B000WGWQG8": 4,
+            "B00YSG2ZPA": 5,
+            "B00006CXSS": 6
+        }
 
-    # Optional: Export results
-    export_results_to_csv(final_rankings, feature_df)
+        asin = get_asin_by_value(products_asins, 6)
 
-    # Optional: Generate detailed report for specific user
-    # generate_user_report(1, final_rankings, create_user_profiles_for_your_data(), feature_df)ndex', 'asin', 'review']])
+        # Run the complete system
+        recommendations = run_complete_recommendation_system_ridge_only(user_id,asin)
+
+
+            # Print the 'text' field from each review
+        for i, review in enumerate(recommendations, start=1):
+          print(f"Review {review['rank']} Text:\n{review['text']}\n{'-' * 80}\n")
+          review_at_index = df_ar.loc[df_ar['index'] == review['review_id']]
+          print(review_at_index['reviewText_ar'].values[0])

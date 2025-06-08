@@ -1,0 +1,54 @@
+{
+  "user_profiles": [
+    {
+      "userId": 1,
+      "query": "historical accuracy WWII Band of Brothers",
+      "interests": ["history", "accuracy", "documentary", "war", "educational"],
+      "demographic": {
+        "age_group": "45-60",
+        "interests_history": true
+      },
+      "past_purchases": ["war_documentaries", "historical_series", "HBO_shows"]
+    },
+    {
+      "userId": 2,
+      "query": "great war series entertainment value",
+      "interests": ["entertainment", "series", "drama", "action", "value"],
+      "demographic": {
+        "age_group": "25-40",
+        "interests_history": false
+      },
+      "past_purchases": ["tv_series", "action_movies", "streaming_content"]
+    },
+    {
+      "userId": 3,
+      "query": "gift for father military history lover",
+      "interests": ["gift", "military", "history", "family", "father"],
+      "demographic": {
+        "age_group": "30-45",
+        "interests_history": true
+      },
+      "past_purchases": ["gifts", "military_history", "documentaries"]
+    },
+    {
+      "userId": 4,
+      "query": "emotional war story miniseries",
+      "interests": ["emotion", "story", "characters", "drama", "miniseries"],
+      "demographic": {
+        "age_group": "35-50",
+        "interests_history": true
+      },
+      "past_purchases": ["drama_series", "character_driven_shows", "award_winners"]
+    },
+    {
+      "userId": 5,
+      "query": "best HBO war production quality",
+      "interests": ["quality", "production", "HBO", "premium", "cinematic"],
+      "demographic": {
+        "age_group": "40-55",
+        "interests_history": true
+      },
+      "past_purchases": ["HBO_shows", "premium_content", "high_budget_series"]
+    }
+  ]
+}
