@@ -12,8 +12,24 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 import warnings
 import json
+from flask import Flask, render_template, request, jsonify, session
+import requests
+import json
+from datetime import datetime
+
+app = Flask(__name__)
+app.secret_key = 'g12g'
 
 warnings.filterwarnings('ignore')
+PRODUCTS = {
+    '1': {'name': 'Game Of Thrones', 'price': 99.99, 'image': 'game-of-thrones.jpg'},
+    '2': {'name': 'Breaking Bad', 'price': 699.99, 'image': 'breakingbad.jpeg'},
+    '3': {'name': 'Lord of the rings ', 'price': 1299.99, 'image': 'lordoftherings.jpeg'},
+    '4': {'name': 'The Godfather', 'price': 14.99, 'image': 'thegodfather.jpeg'},
+    '5': {'name': 'The Hobbit', 'price': 9.99, 'image': 'thehobbit.jpeg'},
+    '6': {'name': 'House of the dragon ', 'price': 24.99, 'image': 'houseofthedragon.jpeg'},
+
+}
 
 
 # ================================
@@ -22,8 +38,10 @@ warnings.filterwarnings('ignore')
 
 def load_your_data(asin):
     # Convert to DataFrame
-    df = pd.read_csv('Movies_and_TV_Reviews_en.csv')
+    df = pd.read_csv('Movies_and_TV_Reviews.csv')
+    df.drop(columns=['reviewText_ar'], inplace=True)
     df = df[df['asin'] == asin]
+
     def estimate_rating(text):
         positive_indicators = ['love', 'great', 'best', 'excellent', 'amazing', 'perfect']
         negative_indicators = ['bad', 'terrible', 'poor', 'awful', 'disappointing']
@@ -492,7 +510,7 @@ def train_ranking_models_ridge_only(training_df):
     # Find best alpha through cross-validation
     for alpha in alphas:
         ridge_model = Ridge(alpha=alpha, random_state=42)
-        cv_scores = cross_val_score(ridge_model, X_train_scaled, y_train, cv=5)
+        cv_scores = cross_val_score(ridge_model, X_train_scaled, y_train, cv=2)
         cv_mean = cv_scores.mean()
 
         print(f"   Alpha {alpha}: CV R² = {cv_mean:.3f} (±{cv_scores.std():.3f})")
@@ -815,6 +833,10 @@ def run_complete_recommendation_system_ridge_only(user_id, asin):
 
 
 
+
+
+df_ar=pd.read_csv('Movies_and_TV_Reviews.csv')
+
 def get_asin_by_value(product_dict, target_value):
     for asin, value in product_dict.items():
         if value == target_value:
@@ -823,27 +845,79 @@ def get_asin_by_value(product_dict, target_value):
 
 
 
-df_ar=pd.read_csv('Movies_and_TV_Reviews_ar.csv')
-
-if __name__ == "__main__":
-        user_id=2
-        products_asins = {
-            "B00R8GUXPG": 1,
-            "B00PY4Q9OS": 2,
-            "B00Q0G2VXM": 3,
-            "B000WGWQG8": 4,
-            "B00YSG2ZPA": 5,
-            "B00006CXSS": 6
-        }
-
-        asin = get_asin_by_value(products_asins, 6)
-
-        # Run the complete system
-        recommendations = run_complete_recommendation_system_ridge_only(user_id,asin)
+@app.route('/')
+def home():
+    """Home page showing available products"""
+    return render_template('home.html', products=PRODUCTS)
 
 
-            # Print the 'text' field from each review
-        for i, review in enumerate(recommendations, start=1):
-          print(f"Review {review['rank']} Text:\n{review['text']}\n{'-' * 80}\n")
-          review_at_index = df_ar.loc[df_ar['index'] == review['review_id']]
-          print(review_at_index['reviewText_ar'].values[0])
+
+
+@app.route('/product/<product_id>')
+def product_page(product_id):
+    """Product detail page with enhanced user handling"""
+    product = PRODUCTS.get(product_id)
+    print(product)
+    products_asins = {
+    '1': 'B00R8GUXPG',
+    '2': 'B00PY4Q9OS',
+    '3': 'B00Q0G2VXM',
+    '4': 'B000WGWQG8',
+    '5': 'B00YSG2ZPA',
+    '6': 'B00006CXSS'
+}
+    asin = products_asins.get(product_id)
+
+    if not product:
+        return "Product not found", 404
+
+    user_id = session.get('user_id')
+    if not user_id:
+        user_id = request.args.get('user_id', '2')  # Default to user 2
+        session['user_id'] = user_id
+
+
+    print(user_id)
+    print(asin)
+    recommendations = run_complete_recommendation_system_ridge_only(int(user_id), asin)
+
+    reviews = []
+    for review in recommendations:
+        arabic_text = df_ar.loc[df_ar['index'] == review['review_id']]['reviewText_ar'].values[0]
+        reviews.append({
+            'rank': review['rank'],
+            'text_en': review['text'],
+            'text_ar': arabic_text,
+            'review_id': review['review_id']
+        })
+
+    return render_template('product.html',
+                           product=product,
+                           product_id=product_id,
+                           user_id=user_id,
+                           reviews=reviews)
+
+# Enhanced user setting route
+@app.route('/set-user/<user_id>')
+def set_user(user_id):
+    """Set user ID in session with validation"""
+    try:
+        # Validate user_id is numeric
+        user_id_int = int(user_id)
+        session['user_id'] = str(user_id_int)
+        return jsonify({
+            'success': True,
+            'message': f"User ID set to: {user_id_int}",
+            'user_id': user_id_int
+        })
+    except ValueError:
+        return jsonify({
+            'success': False,
+            'error': 'User ID must be numeric'
+        }), 400
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+
