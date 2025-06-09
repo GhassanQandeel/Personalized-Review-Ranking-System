@@ -1,0 +1,337 @@
+<!-- templates/product.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} - Reviews{% endblock %}
+
+{% block content %}
+<div class="product-detail">
+    <!-- Product Info -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; padding: 2rem;">
+            <div style="height: 200px; background: #ecf0f1; overflow: hidden;">
+                <img src="{{ url_for('static', filename='images/' ~ product.image) }}"
+                     alt="{{ product.name }}"
+                     style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <div>
+                <h1 style="color: #2c3e50; margin-bottom: 1rem;">{{ product.name }}</h1>
+                <p style="font-size: 2rem; font-weight: bold; color: #27ae60; margin-bottom: 1rem;">${{
+                    "%.2f"|format(product.price) }}</p>
+                <p style="color: #666; margin-bottom: 1.5rem;">Product ID: {{ product_id }}</p>
+                <p style="color: #666; margin-bottom: 1.5rem;">Viewing as: User {{ user_id }}</p>
+                <button class="btn" style="margin-right: 1rem;">Add to Cart</button>
+                <button class="btn btn-secondary">Add to Wishlist</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Reviews Section -->
+    <div class="card">
+        <div style="padding: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 style="color: #2c3e50;">Personalized Customer Reviews</h2>
+                <div>
+                    <button id="refreshReviews" class="btn btn-secondary" style="margin-right: 1rem;">Refresh Reviews
+                    </button>
+                    <a href="/test-recommendations/{{ user_id }}/{{ product_id }}" target="_blank" class="btn"
+                       style="font-size: 0.9rem;">View Raw Data</a>
+                </div>
+            </div>
+
+            <div id="reviewsContainer">
+                {% if reviews %}
+                {% for review in reviews %}
+                <div class="review-item">
+                    <div class="recommendation-rank">Rank #{{ review.rank }}</div>
+                    <div class="review-header">
+                        <div class="review-user">Review ID: {{ review.review_id }}</div>
+                    </div>
+                    <div class="review-title">Original (English):</div>
+                    <div class="review-content">{{ review.text_en }}</div>
+
+                    <div class="review-title">Arabic Translation:</div>
+                    <div class="review-content">{{ review.text_ar }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="no-reviews">No personalized reviews available.</div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .review-item {
+        border-bottom: 1px solid #eee;
+        padding: 1.5rem 0;
+        position: relative;
+    }
+
+    .review-item:last-child {
+        border-bottom: none;
+    }
+
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+
+    .review-user {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .review-date {
+        color: #95a5a6;
+        font-size: 0.9rem;
+    }
+
+    .review-rating {
+        color: #f39c12;
+        margin: 0.5rem 0;
+        font-size: 1.1rem;
+    }
+
+    .review-title {
+        font-weight: bold;
+        margin: 0.5rem 0;
+        color: #2c3e50;
+        font-size: 1.1rem;
+    }
+
+    .review-content {
+        color: #555;
+        line-height: 1.6;
+        margin: 0.5rem 0;
+        font-size: 1rem;
+    }
+
+    .review-meta {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.9rem;
+        color: #95a5a6;
+        margin-top: 1rem;
+        align-items: center;
+    }
+
+    .verified-badge {
+        background: #27ae60;
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.8rem;
+    }
+
+    .personalized-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+
+    .recommendation-rank {
+        position: absolute;
+        top: 1rem;
+        right: 0;
+        background: #3498db;
+        color: white;
+        padding: 0.3rem 0.6rem;
+        border-radius: 0.5rem 0 0 0.5rem;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+
+    .helpful-button {
+        background: none;
+        border: 1px solid #3498db;
+        color: #3498db;
+        cursor: pointer;
+        padding: 0.3rem 0.8rem;
+        border-radius: 3px;
+        transition: all 0.3s ease;
+    }
+
+    .helpful-button:hover {
+        background: #3498db;
+        color: white;
+    }
+
+    .error {
+        background: #ffe6e6;
+        border: 1px solid #ff9999;
+        color: #cc0000;
+        padding: 1rem;
+        border-radius: 5px;
+        text-align: center;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 2rem;
+        color: #666;
+    }
+
+    .no-reviews {
+        text-align: center;
+        color: #666;
+        padding: 3rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .strength-badge {
+        padding: 0.2rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-left: 0.5rem;
+    }
+
+    .strength-excellent {
+        background: #27ae60;
+        color: white;
+    }
+
+    .strength-high {
+        background: #f39c12;
+        color: white;
+    }
+
+    .strength-medium {
+        background: #3498db;
+        color: white;
+    }
+
+    .strength-low {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .ai-explanation {
+        background: #f8f9fa;
+        border-left: 4px solid #667eea;
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .explanation-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        color: #2c3e50;
+    }
+
+    .explanation-icon {
+        margin-right: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .explanation-text {
+        color: #555;
+        font-style: italic;
+        line-height: 1.4;
+    }
+
+    .metrics-section {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+
+    .metrics-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        color: #2c3e50;
+    }
+
+    .metrics-icon {
+        margin-right: 0.5rem;
+    }
+
+    .toggle-metrics {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: background 0.3s ease;
+    }
+
+    .toggle-metrics:hover {
+        background: #2980b9;
+    }
+
+    .metrics-summary {
+        color: #555;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .metric-item {
+        background: white;
+        padding: 0.75rem;
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+    }
+
+    .metric-label {
+        display: block;
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.25rem;
+    }
+
+    .metric-value {
+        display: block;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+
+    .metric-bar {
+        width: 100%;
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .metric-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.3s ease;
+        border-radius: 3px;
+    }
+</style>
+{% endblock %}

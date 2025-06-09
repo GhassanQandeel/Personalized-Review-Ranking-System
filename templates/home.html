@@ -1,0 +1,34 @@
+<!-- templates/home.html -->
+{% extends "base.html" %}
+
+{% block title %}Products - Review System{% endblock %}
+
+{% block content %}
+<div class="products-grid">
+    <h1 style="margin-bottom: 2rem; color: #2c3e50;">Our Products</h1>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+        {% for product_id, product in products.items() %}
+        <div class="card" style="border: 1px solid #ccc; border-radius: 8px; overflow: hidden;">
+            <!-- Image Section -->
+            <div style="height: 200px; background: #ecf0f1; display: flex; align-items: center; justify-content: center;">
+                <img src="{{ url_for('static', filename='images/' ~ product.image) }}"
+                     alt="{{ product.name }}"
+                     style="max-height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
+
+            <!-- Product Info Section -->
+            <div style="padding: 1.5rem;">
+                <h3 style="margin-bottom: 0.5rem; color: #2c3e50;">{{ product.name }}</h3>
+                <p style="font-size: 1.5rem; font-weight: bold; color: #27ae60; margin-bottom: 1rem;">
+                    ${{ "%.2f"|format(product.price) }}
+                </p>
+                <a href="/product/{{ product_id }}" class="btn" style="background-color: #3498db; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px;">
+                    View Product & Reviews
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
