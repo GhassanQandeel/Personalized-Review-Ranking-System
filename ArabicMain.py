@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import warnings
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
