@@ -8,6 +8,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import warnings
+import matplotlib.pyplot as plt
+
+
 
 warnings.filterwarnings('ignore')
 
@@ -560,6 +563,7 @@ def evaluate_system_performance(final_rankings, feature_df):
         print("-" * 50)
 
 
+
 # ================================
 # MAIN EXECUTION
 # ================================
@@ -600,6 +604,9 @@ def main_custom():
         print(f"   - Average quality score: {feature_df['quality_score'].mean():.2f}")
         print()
 
+        # Plot quality score distribution
+        plot_quality_scores(feature_df)
+
     except Exception as e:
         print(f"❌ Error in Phase 1: {str(e)}")
         return
@@ -634,6 +641,7 @@ def main_custom():
     # Phase 4: Evaluation
     try:
         evaluate_system_performance(final_rankings, feature_df)
+        evaluate_classification_performance(feature_df)  # Call classification performance metrics
 
     except Exception as e:
         print(f"❌ Error in Evaluation: {str(e)}")
@@ -664,7 +672,7 @@ def main_custom():
     print(f"   - Reviews in personal context: {len(feature_df[feature_df['personal_context_mentions'] > 0])}")
 
     # Personalization effectiveness
-    print(f"\n🎯 Personalization Effectiveness:")
+    print(f"\n🎯 Personalization Effectiveness:") 
     for user_id, rankings in final_rankings.items():
         user_profile = next(u for u in user_queries if u['userId'] == user_id)
         top_3_scores = [r['final_score'] for r in rankings[:3]]
@@ -674,30 +682,12 @@ def main_custom():
         print(f"     - Top 3 final scores: {[f'{s:.2f}' for s in top_3_scores]}")
         print(f"     - Top 3 personalization: {[f'{s:.2f}' for s in top_3_personalization]}")
 
-    # Recommendations for system improvement
-    print(f"\n💡 System Recommendations:")
-
-    low_quality_count = len(feature_df[feature_df['quality_score'] < 2])
-    if low_quality_count > total_reviews * 0.2:
-        print(f"   ⚠️  High number of low-quality reviews ({low_quality_count}). Consider filtering threshold.")
-
-    low_helpfulness = len(feature_df[feature_df['helpfulness_ratio'] < 0.3])
-    if low_helpfulness > total_reviews * 0.3:
-        print(f"   ⚠️  Many reviews have low helpfulness ratios. Consider weighting adjustment.")
-
-    old_reviews = len(feature_df[feature_df['days_since_review'] > 365])
-    if old_reviews > total_reviews * 0.5:
-        print(f"   ℹ️  {old_reviews} reviews are over 1 year old. Consider recency boost.")
-
-    print(f"   ✅ System successfully personalized {len(user_queries)} different user profiles")
-    print(
-        f"   ✅ Average semantic similarity in top results: {np.mean([np.mean([r['semantic_similarity'] for r in rankings[:5]]) for rankings in final_rankings.values()]):.3f}")
-
     print("\n" + "=" * 70)
     print("🎉 SYSTEM EXECUTION COMPLETE!")
     print("=" * 70)
 
     return final_rankings, feature_df, personalized_results
+
 
 
 # Additional utility functions for post-analysis
@@ -744,7 +734,38 @@ def generate_user_report(user_id, final_rankings, user_queries, feature_df):
         print(f"   Interest Alignment: {review['interest_alignment']:.2f}")
         print(f"   Text: {review['original_text'][:100]}...")
 
+from sklearn.metrics import precision_score, recall_score, f1_score
 
+def evaluate_classification_performance(df):
+    """Evaluate precision, recall, and F1 score for classification task"""
+    
+    # Let's define 'good' reviews as those with rating >= 4
+    y_true = (df['rating'] >= 4).astype(int)  # Actual labels (1 if rating >= 4, else 0)
+    
+    # We will predict good reviews based on the review's quality score
+    y_pred = (df['quality_score'] >= 6).astype(int)  # Predicted labels (1 if quality_score >= 6, else 0)
+
+    # Calculate Precision, Recall, and F1 score
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    
+    # Print the evaluation metrics
+    print(f"Precision: {precision:.2f}")
+    print(f"Recall: {recall:.2f}")
+    print(f"F1 Score: {f1:.2f}")
+
+
+def plot_quality_scores(feature_df):
+    """Plot distribution of the quality scores"""
+    plt.figure(figsize=(8, 6))
+    plt.hist(feature_df['quality_score'], bins=20, color='skyblue', edgecolor='black')
+    plt.title('Distribution of Quality Scores')
+    plt.xlabel('Quality Score')
+    plt.ylabel('Frequency')
+    plt.show()
+
+    
 # Execute the system
 if __name__ == "__main__":
     # Run the main system
@@ -753,5 +774,7 @@ if __name__ == "__main__":
     # Optional: Export results
     export_results_to_csv(final_rankings, feature_df)
 
-    # Optional: Generate detailed report for specific user
-    # generate_user_report(1, final_rankings, create_user_profiles_for_your_data(), feature_df)ndex', 'asin', 'review']])
+    plot_quality_scores(feature_df)
+
+    evaluate_classification_performance(feature_df)
+
