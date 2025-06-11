@@ -516,6 +516,7 @@ def main_custom():
     print(f"\nDataset shape: {reviews_df.shape}")
     print(f"Columns: {list(reviews_df.columns)}\n")
 
+    # Phase 1: Feature Engineering
     try:
         feature_df = phase1_feature_engineering_custom(reviews_df)
         print(f"✅ Phase 1 Complete: Extracted features for {len(feature_df)} reviews\n")
@@ -526,10 +527,14 @@ def main_custom():
         print(f"   - Sentiment features: {len([col for col in feature_df.columns if col.startswith('sentiment_')])} sentiment metrics")
         print(f"   - Average quality score: {feature_df['quality_score'].mean():.2f}\n")
 
+        # Plot the distribution of quality scores
+        plot_quality_scores(feature_df)
+
     except Exception as e:
         print(f"❌ Error in Phase 1: {str(e)}")
         return
 
+    # Phase 2: Personalization
     try:
         personalized_results = phase2_personalization_custom(feature_df, user_queries)
         print(f"✅ Phase 2 Complete: Personalized rankings for {len(personalized_results)} users\n")
@@ -537,6 +542,7 @@ def main_custom():
         print(f"❌ Error in Phase 2: {str(e)}")
         return
 
+    # Phase 3: Final Ranking
     try:
         final_rankings = phase3_ranking_system_custom(feature_df, personalized_results)
         print(f"✅ Phase 3 Complete: Final rankings generated for all users\n")
@@ -544,8 +550,13 @@ def main_custom():
         print(f"❌ Error in Phase 3: {str(e)}")
         return
 
+    # Phase 4: Evaluation
     try:
         evaluate_system_performance(final_rankings, feature_df)
+
+        # Call classification performance metrics for precision, recall, F1 score
+        evaluate_classification_performance(feature_df)
+
     except Exception as e:
         print(f"❌ Error in Evaluation: {str(e)}")
 
@@ -556,7 +567,40 @@ def main_custom():
     return final_rankings, feature_df, personalized_results
 
 
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+def evaluate_classification_performance(df):
+    """Evaluate precision, recall, and F1 score for classification task"""
+    
+    # Let's define 'good' reviews as those with rating >= 4
+    y_true = (df['rating'] >= 4).astype(int)  # Actual labels (1 if rating >= 4, else 0)
+    
+    # We will predict good reviews based on the review's quality score
+    y_pred = (df['quality_score'] >= 6).astype(int)  # Predicted labels (1 if quality_score >= 6, else 0)
+
+    # Calculate Precision, Recall, and F1 score
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    
+    # Print the evaluation metrics
+    print(f"Precision: {precision:.2f}")
+    print(f"Recall: {recall:.2f}")
+    print(f"F1 Score: {f1:.2f}")
+
+
+def plot_quality_scores(feature_df):
+    """Plot distribution of the quality scores"""
+    plt.figure(figsize=(8, 6))
+    plt.hist(feature_df['quality_score'], bins=20, color='skyblue', edgecolor='black')
+    plt.title('Distribution of Quality Scores')
+    plt.xlabel('Quality Score')
+    plt.ylabel('Frequency')
+    plt.show()
+
 if __name__ == "__main__":
     # The script will now run the entire pipeline with your specified settings
     final_rankings, feature_df, personalized_results = main_custom()
     export_results_to_csv(final_rankings, feature_df)
+    evaluate_classification_performance(feature_df)
+    plot_quality_scores(feature_df)
