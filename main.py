@@ -229,8 +229,8 @@ def phase1_feature_engineering_custom(df):
     """
     Phase 1: Feature engineering customized for your data
     """
-    print("=== PHASE 1: FEATURE ENGINEERING (Customized for Your Data) ===")
-    print(f"Processing {len(df)} reviews from your dataset...\n")
+
+
 
     features_list = []
 
@@ -320,16 +320,13 @@ def phase2_personalization_custom(feature_df, user_queries):
     """
     Phase 2: Personalization customized for your data
     """
-    print("=== PHASE 2: PERSONALIZATION (Customized for Your Data) ===")
-    print("Calculating personalized relevance scores...\n")
+
 
     personalized_results = {}
 
     for user_profile in user_queries:
         user_id = user_profile["userId"]
-        print(f"Processing User {user_id}:")
-        print(f"Query: '{user_profile['query']}'")
-        print(f"Interests: {user_profile['interests']}")
+
 
         user_results = []
 
@@ -417,7 +414,6 @@ def create_training_data(feature_df, personalized_results):
     """
     Create training data for the ranking model
     """
-    print("🔧 Creating training data for ML ranking model...")
 
     training_data = []
 
@@ -470,10 +466,7 @@ def create_training_data(feature_df, personalized_results):
             training_data.append(features)
 
     training_df = pd.DataFrame(training_data)
-    print(f"✅ Created training dataset with {len(training_df)} samples")
-    print(f"   - Users: {training_df['user_id'].nunique()}")
-    print(f"   - Features: {len(training_df.columns) - 2}")  # Exclude user_id and target
-    print(f"   - Target range: {training_df['relevance_score'].min():.2f} - {training_df['relevance_score'].max():.2f}")
+
 
     return training_df
 
@@ -482,7 +475,6 @@ def train_ranking_models_ridge_only(training_df):
     """
     Train only Ridge Regression model for ranking
     """
-    print("\n🤖 Training Ridge Regression ranking model...")
 
     # Prepare features and target
     feature_cols = [col for col in training_df.columns if col not in ['user_id', 'relevance_score']]
@@ -505,7 +497,6 @@ def train_ranking_models_ridge_only(training_df):
     best_alpha = 1.0
     best_cv_score = -np.inf
 
-    print("🔍 Testing different Ridge alpha values...")
 
     # Find best alpha through cross-validation
     for alpha in alphas:
@@ -513,14 +504,12 @@ def train_ranking_models_ridge_only(training_df):
         cv_scores = cross_val_score(ridge_model, X_train_scaled, y_train, cv=2)
         cv_mean = cv_scores.mean()
 
-        print(f"   Alpha {alpha}: CV R² = {cv_mean:.3f} (±{cv_scores.std():.3f})")
 
         if cv_mean > best_cv_score:
             best_cv_score = cv_mean
             best_alpha = alpha
 
     # Train final model with best alpha
-    print(f"\n🏆 Best alpha: {best_alpha} (CV R²: {best_cv_score:.3f})")
 
     final_model = Ridge(alpha=best_alpha, random_state=42)
     final_model.fit(X_train_scaled, y_train)
@@ -529,10 +518,7 @@ def train_ranking_models_ridge_only(training_df):
     train_score = final_model.score(X_train_scaled, y_train)
     test_score = final_model.score(X_test_scaled, y_test)
 
-    print(f"\n📊 Final Ridge Model Performance:")
-    print(f"   📊 Train R²: {train_score:.3f}")
-    print(f"   📊 Test R²: {test_score:.3f}")
-    print(f"   📊 CV R²: {best_cv_score:.3f}")
+
 
     # Feature importance (coefficients for Ridge)
     feature_importance = pd.DataFrame({
@@ -563,8 +549,7 @@ def phase3_ml_ranking_system_ridge_only(feature_df, personalized_results):
     """
     Phase 3: ML-based ranking system using only Ridge Regression
     """
-    print("=== PHASE 3: RIDGE REGRESSION RANKING SYSTEM ===")
-    print("Using Ridge Regression to rank reviews...\n")
+
 
     # Create training data
     training_df = create_training_data(feature_df, personalized_results)
@@ -573,12 +558,10 @@ def phase3_ml_ranking_system_ridge_only(feature_df, personalized_results):
     model, scaler, feature_cols, model_results = train_ranking_models_ridge_only(training_df)
 
     # Generate predictions for all user-review combinations
-    print("\n🔮 Generating Ridge Regression rankings...")
 
     final_rankings = {}
 
     for user_id, user_reviews in personalized_results.items():
-        print(f"\nRidge Regression Rankings for User {user_id}:")
 
         ranked_reviews = []
 
@@ -651,13 +634,12 @@ def evaluate_ranking_systems(feature_df, personalized_results, ml_rankings):
         """
         Compare different ranking approaches
         """
-        print("=== RANKING SYSTEM EVALUATION ===")
-        print("Comparing different ranking approaches...\n")
+
 
         evaluation_results = {}
 
         for user_id in personalized_results.keys():
-            print(f"📊 Evaluation for User {user_id}:")
+
 
             # Get rankings from different methods
             rule_based = personalized_results[user_id]  # Rule-based personalization
@@ -677,19 +659,6 @@ def evaluate_ranking_systems(feature_df, personalized_results, ml_rankings):
 
             baseline_ranking.sort(key=lambda x: x['score'], reverse=True)
 
-            # Compare top 5 recommendations
-            print("🔍 Top 5 Recommendations Comparison:")
-            print("\nRule-based Personalization:")
-            for i, review in enumerate(rule_based[:5], 1):
-                print(f"{i}. ID {review['review_id']} (Score: {review['personalization_score']:.2f})")
-
-            print("\nML-based Ranking:")
-            for i, review in enumerate(ml_based[:5], 1):
-                print(f"{i}. ID {review['review_id']} (Score: {review['ml_score']:.2f})")
-
-            print("\nBaseline (Rating + Helpfulness):")
-            for i, review in enumerate(baseline_ranking[:5], 1):
-                print(f"{i}. ID {review['review_id']} (Score: {review['score']:.2f})")
 
             # Calculate ranking correlation
             rule_top5 = [r['review_id'] for r in rule_based[:5]]
@@ -720,8 +689,7 @@ def generate_personalized_recommendations_ridge(user_id, ridge_rankings, feature
     """
     Generate final personalized recommendations using Ridge Regression scores
     """
-    print(f"🎯 RIDGE REGRESSION RECOMMENDATIONS FOR USER {user_id}")
-    print("=" * 60)
+
 
     user_rankings = ridge_rankings[user_id]
     recommendations = []
@@ -791,39 +759,30 @@ def run_complete_recommendation_system_ridge_only(user_id, asin):
     Run the complete recommendation system with Ridge Regression only
     """
     global recommendations
-    print("🚀 STARTING RECOMMENDATION SYSTEM")
 
 
     # Load and preprocess data
-    print("📊 Loading your review data...")
     df = load_your_data(asin)
-    print(f"✅ Loaded {len(df)} reviews successfully\n")
 
     # Create user profiles
     user_queries = create_user_profiles_for_your_data(user_id)
 
     # Phase 1: Feature Engineering
     feature_df = phase1_feature_engineering_custom(df)
-    print(f"✅ Phase 1 Complete: Extracted features for {len(feature_df)} reviews\n")
 
     # Phase 2: Personalization
     personalized_results = phase2_personalization_custom(feature_df, user_queries)
-    print(f"✅ Phase 2 Complete: Generated personalized rankings\n")
 
     # Phase 3: Ridge Regression Ranking
     ridge_rankings, model, scaler, feature_cols = phase3_ml_ranking_system_ridge_only(
         feature_df, personalized_results
     )
-    print(f"✅ Phase 3 Complete: Ridge Regression ranking system trained and applied\n")
 
     # Generate final recommendations
-    print("🎯 GENERATING FINAL RIDGE REGRESSION RECOMMENDATIONS")
-    print("=" * 70)
 
     for user_profile in user_queries:
         user_id_num = user_profile['userId']
-        print(f"\n👤 User {user_id_num} Query: '{user_profile['query']}'")
-        print(f"Interests: {user_profile['interests']}")
+
 
         recommendations = generate_personalized_recommendations_ridge(
             user_id_num, ridge_rankings, feature_df, top_k=3
@@ -857,7 +816,6 @@ def home():
 def product_page(product_id):
     """Product detail page with enhanced user handling"""
     product = PRODUCTS.get(product_id)
-    print(product)
     products_asins = {
     '1': 'B00R8GUXPG',
     '2': 'B00PY4Q9OS',
@@ -877,8 +835,7 @@ def product_page(product_id):
         session['user_id'] = user_id
 
 
-    print(user_id)
-    print(asin)
+
     recommendations = run_complete_recommendation_system_ridge_only(int(user_id), asin)
 
     reviews = []
@@ -897,7 +854,7 @@ def product_page(product_id):
                            user_id=user_id,
                            reviews=reviews)
 
-# Enhanced user setting route
+#from flask import session, jsonify
 @app.route('/set-user/<user_id>')
 def set_user(user_id):
     """Set user ID in session with validation"""
@@ -915,6 +872,23 @@ def set_user(user_id):
             'success': False,
             'error': 'User ID must be numeric'
         }), 400
+
+@app.route('/set-lang/<lang_code>')
+def set_lang(lang_code):
+    """Set language in session with validation"""
+    if lang_code not in ['en', 'ar']:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid language code. Supported: en, ar'
+        }), 400
+
+    session['lang'] = lang_code
+    return jsonify({
+        'success': True,
+        'message': f"Language set to: {lang_code}",
+        'language': lang_code
+    })
+
 
 if __name__ == '__main__':
     app.run(debug=True)
