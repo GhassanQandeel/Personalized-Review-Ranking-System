@@ -27,41 +27,77 @@
 
 
     <!-- Reviews Section -->
-    <div class="card">
-        <div style="padding: 2rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h2 style="color: #2c3e50;">Personalized Customer Reviews</h2>
-                <div>
-                    <button id="refreshReviews" class="btn btn-secondary" style="margin-right: 1rem;">Refresh Reviews
-                    </button>
-                    <a href="/test-recommendations/{{ user_id }}/{{ product_id }}" target="_blank" class="btn"
-                       style="font-size: 0.9rem;">View Raw Data</a>
-                </div>
+<div class="card">
+    <div style="padding: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2 style="color: #2c3e50;">
+                {% if session['lang'] == 'ar' %}
+                    المراجعات المخصصة للعملاء
+                {% else %}
+                    Personalized Customer Reviews
+                {% endif %}
+            </h2>
+            <div>
+                <button id="refreshReviews" class="btn btn-secondary" style="margin-right: 1rem;">
+                    {% if session['lang'] == 'ar' %} تحديث المراجعات {% else %} Refresh Reviews {% endif %}
+                </button>
+                <a href="/test-recommendations/{{ user_id }}/{{ product_id }}" target="_blank" class="btn"
+                   style="font-size: 0.9rem;">
+                    {% if session['lang'] == 'ar' %} عرض البيانات الأصلية {% else %} View Raw Data {% endif %}
+                </a>
             </div>
+        </div>
 
-            <div id="reviewsContainer">
-                {% if reviews %}
+        <div id="reviewsContainer">
+            {% if reviews %}
                 {% for review in reviews %}
                 <div class="review-item">
-                    <div class="recommendation-rank">Rank #{{ review.rank }}</div>
-                    <div class="review-header">
-                        <div class="review-user">Review ID: {{ review.review_id }}</div>
+                    <div class="recommendation-rank">
+                        {% if session['lang'] == 'ar' %}
+                            الترتيب رقم {{ review.rank }}
+                        {% else %}
+                            Rank #{{ review.rank }}
+                        {% endif %}
                     </div>
-                    <div class="review-title">Original (English):</div>
-                    <div class="review-content">{{ review.text_en }}</div>
+                    <div class="review-header">
+                        <div class="review-user">
+                            {% if session['lang'] == 'ar' %}
+                                معرف المراجعة: {{ review.review_id }}
+                            {% else %}
+                                Review ID: {{ review.review_id }}
+                            {% endif %}
+                        </div>
+                    </div>
 
-                    <div class="review-title">Arabic Translation:</div>
-                    <div class="review-content">{{ review.text_ar }}</div>
+                    <div class="review-title">
+                        {% if session['lang'] == 'ar' %}
+                            نص المراجعة:
+                        {% else %}
+                            Review Text:
+                        {% endif %}
+                    </div>
+                    <div class="review-content">
+                        {% if session['lang'] == 'ar' %}
+                            {{ review.text_ar }}
+                        {% else %}
+                            {{ review.text_en }}
+                        {% endif %}
+                    </div>
                 </div>
                 {% endfor %}
-                {% else %}
-                <div class="no-reviews">No personalized reviews available.</div>
-                {% endif %}
-            </div>
-
+            {% else %}
+                <div class="no-reviews">
+                    {% if session['lang'] == 'ar' %}
+                        لا توجد مراجعات مخصصة متاحة.
+                    {% else %}
+                        No personalized reviews available.
+                    {% endif %}
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
 
 <style>
     @keyframes spin {
